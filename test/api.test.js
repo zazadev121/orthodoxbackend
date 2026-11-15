@@ -301,6 +301,38 @@ test("quotation lifecycle: draft stays private, publish, edit, delete", async ()
   );
 });
 
+test("quotes can be created, published and edited without a source URL", async () => {
+  const app = createApp({ env: {}, db: memoryDb() });
+  const quote = {
+    father: "Test Father",
+    text_ckb: "دەقی تاقیکردنەوە",
+    text_kmr: "Nivîsa ceribandinê",
+    text_en: "An English quotation",
+    reference: "Homily 1",
+    topic: "Faith",
+    published: true,
+  };
+  for (const body of [quote, { ...quote, source_url: "" }]) {
+    const created = await request(app).post("/api/admin/quotes")
+      .set("Authorization", "Bearer admin").send(body);
+    assert.equal(created.status, 201);
+    assert.equal(created.body.source_url, "");
+    assert.equal(created.body.text_en, quote.text_en);
+    const edited = await request(app).patch(`/api/admin/quotes/${created.body.id}`)
+      .set("Authorization", "Bearer admin").send({ ...quote, reference: "Homily 2" });
+    assert.equal(edited.status, 200);
+    assert.equal(edited.body.source_url, "");
+    assert.equal(edited.body.reference, "Homily 2");
+  }
+  const visible = await request(app).get("/api/quotes");
+  assert.equal(visible.body.quotes.length, 2);
+  assert.ok(visible.body.quotes.every(q => q.source_url === "" && q.text_en === quote.text_en));
+  const prayer = await request(app).post("/api/admin/prayers")
+    .set("Authorization", "Bearer admin")
+    .send({ ...quote, title_ckb: "نوێژ", title_kmr: "Dua" });
+  assert.equal(prayer.status, 400);
+});
+
 test("only approved source records are exposed and used for AI", async () => {
   let providerCalled = false;
   const app = createApp({
@@ -655,3 +687,4 @@ test("admin writes validate all fields and publisher hosts", async () => {
     400,
   );
 });
+
