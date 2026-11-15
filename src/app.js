@@ -23,7 +23,10 @@ const quoteSchema = z.object({
   text_kmr: z.string().trim().min(1).max(5000),
   text_en: z.string().trim().max(5000).optional(),
   reference: z.string().trim().min(3).max(500),
-  source_url: z.url().refine(approvedUrl, "Use an approved Orthodox publisher"),
+  source_url: z.union([
+    z.literal(""),
+    z.url().refine(approvedUrl, "Use an approved Orthodox publisher"),
+  ]).default(""),
   topic: z.string().trim().min(1).max(100),
   published: z.boolean(),
 });
@@ -46,6 +49,7 @@ const sourceSchema = z
     },
   );
 const prayerSchema = quoteSchema.omit({ father: true }).extend({
+  source_url: z.url().refine(approvedUrl, "Use an approved Orthodox publisher"),
   title_ckb: z.string().trim().min(2).max(200),
   title_kmr: z.string().trim().min(2).max(200),
   text_ckb: z.string().trim().min(1).max(12000),
@@ -366,3 +370,4 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
   });
   return app;
 }
+
