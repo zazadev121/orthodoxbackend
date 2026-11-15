@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { encodeContent, decodeContent } from "./content-i18n.js";
 import { starterPrayers } from "./prayers.js";
+import { defaultOwnerEmail, verifiedOwner, ensureOwnerRole } from "./owner.js";
 import {
   approvedUrl,
   starterSources,
@@ -106,16 +107,19 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
       return res
         .status(401)
         .json({ error: "Your session has expired. Sign in again." });
-    const role = await supabase
-      .from("admins")
-      .select("user_id")
-      .eq("user_id", data.user.id)
-      .maybeSingle();
-    if (role.error) throw role.error;
-    if (!role.data)
+    if (!verifiedOwner(data.user, env.OWNER_EMAIL || defaultOwnerEmail))
       return res
         .status(403)
-        .json({ error: "Administrator access is required." });
+        .json({
+          error: "Only the verified website owner can access administration.",
+        });
+    if (!(await ensureOwnerRole(supabase, data.user)))
+      return res
+        .status(403)
+        .json({
+          error:
+            "Another owner is assigned. Check the single administrator record in Supabase.",
+        });
     next();
   }
   app.get("/api/quotes", async (req, res) => {

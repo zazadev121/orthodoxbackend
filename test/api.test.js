@@ -10,16 +10,23 @@ import {
   validateAnswer,
 } from "../src/sources.js";
 
-function memoryDb() {
+function memoryDb({
+  user = {
+    id: "user-id",
+    email: "gelaguka6@gmail.com",
+    email_confirmed_at: "2026-11-15T00:00:00Z",
+  },
+  adminRows = [{ user_id: "user-id" }],
+} = {}) {
   const rows = {
     quotes: [],
     prayers: [],
     sources: [],
-    admins: [{ user_id: "user-id" }],
+    admins: [...adminRows],
   };
   return {
     auth: {
-      getUser: async () => ({ data: { user: { id: "user-id" } }, error: null }),
+      getUser: async () => ({ data: { user }, error: null }),
     },
     from(table) {
       const filters = [];
@@ -30,6 +37,8 @@ function memoryDb() {
           filters.every(([k, v]) => r[k] === v),
         );
         if (op === "insert") {
+          if (table === "admins" && rows.admins.length)
+            return { data: null, error: { code: "23505" } };
           const record = {
             ...body,
             id: randomUUID(),
@@ -87,6 +96,48 @@ function memoryDb() {
   };
 }
 
+test("verified owner claims the one admin role on first sign-in", async () => {
+  const app = createApp({ env: {}, db: memoryDb({ adminRows: [] }) });
+  for (let i = 0; i < 2; i++) {
+    const r = await request(app)
+      .get("/api/admin/me")
+      .set("Authorization", "Bearer owner");
+    assert.equal(r.status, 200);
+    assert.equal(r.body.admin, true);
+  }
+});
+test("unverified owner and other emails cannot become admin", async () => {
+  for (const user of [
+    { id: "user-id", email: "gelaguka6@gmail.com" },
+    {
+      id: "user-id",
+      email: "other@example.com",
+      email_confirmed_at: "2026-11-15",
+    },
+    {
+      id: "user-id",
+      email: "other@example.com",
+      email_confirmed_at: "2026-11-15",
+      user_metadata: { email: "gelaguka6@gmail.com" },
+    },
+  ]) {
+    const r = await request(createApp({ env: {}, db: memoryDb({ user }) }))
+      .get("/api/admin/me")
+      .set("Authorization", "Bearer user");
+    assert.equal(r.status, 403);
+  }
+});
+test("automatic owner access never replaces an existing different admin", async () => {
+  const r = await request(
+    createApp({
+      env: {},
+      db: memoryDb({ adminRows: [{ user_id: "someone-else" }] }),
+    }),
+  )
+    .get("/api/admin/me")
+    .set("Authorization", "Bearer owner");
+  assert.equal(r.status, 403);
+});
 test("prayer lifecycle protects drafts and supports bilingual edits", async () => {
   const app = createApp({ env: {}, db: memoryDb() });
   const draft = {
@@ -391,7 +442,16 @@ function mockDb({ admin = true, valid = true } = {}) {
     auth: {
       getUser: async () =>
         valid
-          ? { data: { user: { id: "user-id" } }, error: null }
+          ? {
+              data: {
+                user: {
+                  id: "user-id",
+                  email: admin ? "gelaguka6@gmail.com" : "visitor@example.com",
+                  email_confirmed_at: "2026-11-15T00:00:00Z",
+                },
+              },
+              error: null,
+            }
           : { data: { user: null }, error: {} },
     },
     from(table) {

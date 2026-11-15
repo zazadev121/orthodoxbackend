@@ -1,5 +1,7 @@
 # Orthodoxy in Kurdistan — backend
 
+Owner sign-in is restricted server-side to the verified Supabase email `gelaguka6@gmail.com` (override with `OWNER_EMAIL`). Its first authenticated admin request assigns the single `admins` role if vacant. Unverified email accounts, user metadata claims and other addresses cannot claim ownership. Existing conflicting admin records are never deleted or replaced automatically. Published prayers remain available anonymously through `GET /api/prayers`; only writing and draft access require owner authentication.
+
 English (`en`) is supported for AI answers and as an optional comparison translation on prayers/quotations. English source answers use the existing English evidence summary. Content translations use a tagged JSON envelope inside the existing `text_kmr` column and are decoded at API boundaries; legacy plain Kurdish rows remain compatible. No SQL migration is needed. On startup, English is added only to untouched seeded prayer texts, preserving owner edits. English fields are optional on custom records; the frontend clearly indicates missing translations.
 
 ## AI answer integrity
