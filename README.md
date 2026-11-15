@@ -1,5 +1,33 @@
 # Orthodoxy in Kurdistan — backend
 
+## Prayers, single owner, and Render troubleshooting
+
+Run the latest `supabase/schema.sql` in Supabase SQL Editor even if you ran an earlier version. It adds bilingual prayers and a database constraint permitting **at most one** admin. It never deletes existing users. If multiple old admin rows exist, resolve ownership manually before rerunning the migration.
+
+Prayers use `GET /api/prayers` (published only) and the protected `/api/admin/prayers` CRUD endpoints, with Sorani/Kurmanji titles and texts, topic, source reference/URL and draft/publish state. Add editorially checked prayer translations in the admin panel; none are invented or automatically published.
+
+To create the one owner, configure backend `.env`, run the latest schema, then:
+
+```powershell
+npm run setup-admin -- your-email@example.com
+```
+
+This creates a real Supabase Auth user with a randomly generated password, assigns the sole admin role, and saves credentials in `backend/admin-credentials.txt`, which Git and Docker ignore. It refuses to replace an existing administrator or overwrite saved credentials. Store the password securely, delete the local credentials file, and disable public sign-ups in Supabase Auth. Existing email accounts must be recovered and assigned manually in Supabase; this command does not reset their passwords. Sign in at `https://orthodoxfrontend.vercel.app/#admin`.
+
+Render environment variables:
+
+```text
+FRONTEND_ORIGIN=https://orthodoxfrontend.vercel.app
+TRUST_PROXY_HOPS=1
+GROQ_API_KEY=<replacement Groq key>
+SUPABASE_URL=<project URL>
+SUPABASE_SECRET_KEY=<server secret or service-role key>
+```
+
+Render defaults to one trusted proxy when `RENDER=true` and `TRUST_PROXY_HOPS` is unset. An explicit hop count overrides this default. Revisit that count if adding another reverse proxy.
+
+`aiConfigured: false` from `/api/health` means no Groq key is present. `databaseConfigured: true` only means the URL and key variables exist; it is not a live database test. Database query errors now distinguish missing schema (`DATABASE_SCHEMA_MISSING`) and invalid credentials (`DATABASE_CREDENTIALS_INVALID`). Run the SQL for missing tables; verify that both the URL and server key belong to the same project for key errors. Add the Groq token only to the backend, never Vercel.
+
 Node 22+ / Express API, Supabase Auth + Postgres, Groq. Frontend: https://github.com/zazadev121/orthodoxfrontend
 
 ## Setup

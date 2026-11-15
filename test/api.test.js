@@ -11,7 +11,12 @@ import {
 } from "../src/sources.js";
 
 function memoryDb() {
-  const rows = { quotes: [], sources: [], admins: [{ user_id: "user-id" }] };
+  const rows = {
+    quotes: [],
+    prayers: [],
+    sources: [],
+    admins: [{ user_id: "user-id" }],
+  };
   return {
     auth: {
       getUser: async () => ({ data: { user: { id: "user-id" } }, error: null }),
@@ -81,6 +86,108 @@ function memoryDb() {
     },
   };
 }
+
+test("prayer lifecycle protects drafts and supports bilingual edits", async () => {
+  const app = createApp({ env: {}, db: memoryDb() });
+  const draft = {
+    title_ckb: "نوێژی تاقیکردنەوە",
+    title_kmr: "Duaya ceribandinê",
+    text_ckb: "دەقی تاقیکردنەوە",
+    text_kmr: "Nivîsa ceribandinê",
+    reference: "Test prayer, section 1",
+    source_url: "https://www.oca.org/orthodoxy",
+    topic: "Test",
+    published: false,
+  };
+  assert.equal(
+    (await request(app).post("/api/admin/prayers").send(draft)).status,
+    401,
+  );
+  const created = await request(app)
+    .post("/api/admin/prayers")
+    .set("Authorization", "Bearer admin")
+    .send(draft);
+  assert.equal(created.status, 201);
+  assert.deepEqual((await request(app).get("/api/prayers")).body.prayers, []);
+  const id = created.body.id;
+  assert.equal(
+    (
+      await request(app)
+        .patch(`/api/admin/prayers/${id}`)
+        .set("Authorization", "Bearer admin")
+        .send({ ...draft, published: true })
+    ).status,
+    200,
+  );
+  const publicItems = (await request(app).get("/api/prayers")).body.prayers;
+  assert.equal(publicItems.length, 1);
+  assert.equal(publicItems[0].title_kmr, draft.title_kmr);
+  assert.equal(
+    (
+      await request(app)
+        .delete(`/api/admin/prayers/${id}`)
+        .set("Authorization", "Bearer admin")
+    ).status,
+    204,
+  );
+  assert.deepEqual((await request(app).get("/api/prayers")).body.prayers, []);
+});
+
+test("Render defaults to one trusted proxy; explicit configuration takes precedence", () => {
+  assert.equal(createApp({ env: { RENDER: "true" } }).get("trust proxy"), 1);
+  assert.equal(
+    createApp({ env: { RENDER: "true", TRUST_PROXY_HOPS: "0" } }).get(
+      "trust proxy",
+    ),
+    false,
+  );
+  assert.equal(createApp({ env: {} }).get("trust proxy"), false);
+});
+
+test("missing tables and invalid database credentials return actionable setup codes", async () => {
+  for (const [error, expected] of [
+    [{ code: "PGRST205" }, "DATABASE_SCHEMA_MISSING"],
+    [{ code: "42P01" }, "DATABASE_SCHEMA_MISSING"],
+    [{ message: "Invalid API key" }, "DATABASE_CREDENTIALS_INVALID"],
+  ]) {
+    const db = {
+      from() {
+        const chain = {
+          select() {
+            return chain;
+          },
+          eq() {
+            return chain;
+          },
+          order() {
+            return chain;
+          },
+          limit: async () => ({ data: null, error }),
+        };
+        return chain;
+      },
+    };
+    const res = await request(createApp({ env: {}, db })).get("/api/quotes");
+    assert.equal(res.status, 503);
+    assert.equal(res.body.code, expected);
+  }
+});
+
+test("missing Groq key is reported before database retrieval", async () => {
+  const app = createApp({
+    env: {},
+    db: {
+      from() {
+        throw new Error("must not query");
+      },
+    },
+  });
+  const res = await request(app)
+    .post("/api/chat")
+    .send({ question: "باوەڕ چییە؟" });
+  assert.equal(res.status, 503);
+  assert.equal(res.body.code, "AI_NOT_CONFIGURED");
+});
 
 test("quotation lifecycle: draft stays private, publish, edit, delete", async () => {
   const app = createApp({ env: {}, db: memoryDb() });

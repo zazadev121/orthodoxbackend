@@ -29,6 +29,12 @@ const sourceSchema = z.object({
   keywords: z.string().trim().min(3).max(1500),
   approved: z.boolean(),
 });
+const prayerSchema = quoteSchema.omit({ father: true }).extend({
+  title_ckb: z.string().trim().min(2).max(200),
+  title_kmr: z.string().trim().min(2).max(200),
+  text_ckb: z.string().trim().min(1).max(12000),
+  text_kmr: z.string().trim().min(1).max(12000),
+});
 const idSchema = z.uuid();
 export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
   const supabase =
@@ -40,7 +46,7 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
       : null);
   const app = express();
   app.disable("x-powered-by");
-  const hops = Number(env.TRUST_PROXY_HOPS || 0);
+  const hops = Number(env.TRUST_PROXY_HOPS ?? (env.RENDER === "true" ? 1 : 0));
   if (Number.isInteger(hops) && hops > 0) app.set("trust proxy", hops);
   app.use(helmet());
   const origins = (env.FRONTEND_ORIGIN || "http://localhost:5173")
@@ -53,7 +59,7 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
       allowedHeaders: ["Authorization", "Content-Type"],
     }),
   );
-  app.use(express.json({ limit: "40kb" }));
+  app.use(express.json({ limit: "100kb" }));
   app.use(
     "/api",
     rateLimit({
@@ -107,6 +113,17 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
     if (error) throw error;
     res.json({ quotes: data });
   });
+  app.get("/api/prayers", async (_req, res) => {
+    if (!supabase) return res.json({ prayers: [], setupRequired: true });
+    const { data, error } = await supabase
+      .from("prayers")
+      .select("*")
+      .eq("published", true)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw error;
+    res.json({ prayers: data });
+  });
   app.get("/api/sources", async (_req, res) => {
     const sources = await loadSources();
     res.json({ sources: sources.map(({ content, keywords, ...s }) => s) });
@@ -126,6 +143,7 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
   for (const [path, table, schema] of [
     ["quotes", "quotes", quoteSchema],
     ["sources", "sources", sourceSchema],
+    ["prayers", "prayers", prayerSchema],
   ]) {
     app.get(`/api/admin/${path}`, async (_req, res) => {
       const { data, error } = await supabase
@@ -187,19 +205,20 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
           language: z.enum(["ckb", "kmr"]).default("ckb"),
         })
         .parse(req.body);
-      const sources = retrieve(question, await loadSources());
-      const declined = () =>
-        res.json({ answer: refusal[language], citations: [], grounded: false });
-      if (!sources.length) return declined();
       if (!env.GROQ_API_KEY)
         return res
           .status(503)
           .json({
+            code: "AI_NOT_CONFIGURED",
             error:
               language === "ckb"
                 ? "خزمەتگوزاریی زیرەکی دەستکرد هێشتا ئامادە نییە."
                 : "Xizmeta AI hîn ne amade ye.",
           });
+      const sources = retrieve(question, await loadSources());
+      const declined = () =>
+        res.json({ answer: refusal[language], citations: [], grounded: false });
+      if (!sources.length) return declined();
       const response = await fetcher(
         "https://api.groq.com/openai/v1/chat/completions",
         {
@@ -235,14 +254,12 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
         },
       );
       if (!response.ok)
-        return res
-          .status(502)
-          .json({
-            error:
-              language === "ckb"
-                ? "خزمەتگوزارییەکە کاتێکی تر تاقی بکەوە."
-                : "Ji kerema xwe paşê dîsa biceribîne.",
-          });
+        return res.status(502).json({
+          error:
+            language === "ckb"
+              ? "خزمەتگوزارییەکە کاتێکی تر تاقی بکەوە."
+              : "Ji kerema xwe paşê dîsa biceribîne.",
+        });
       const result = await response.json();
       let raw;
       try {
@@ -257,26 +274,41 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
   );
   app.use((_req, res) => res.status(404).json({ error: "Route not found." }));
   app.use((err, _req, res, _next) => {
-    if (err instanceof z.ZodError)
+    if (["PGRST205", "42P01", "PGRST204", "42703"].includes(err.code))
       return res
-        .status(400)
+        .status(503)
         .json({
-          error: "Please check the form fields.",
-          details: err.issues.map((i) => ({
-            field: i.path.join("."),
-            message: i.message,
-          })),
+          code: "DATABASE_SCHEMA_MISSING",
+          error:
+            "Database setup is incomplete. Run supabase/schema.sql in the Supabase SQL Editor.",
         });
+    if (
+      ["PGRST301", "PGRST302", "42501"].includes(err.code) ||
+      /invalid api key|invalid jwt/i.test(err.message || "")
+    )
+      return res
+        .status(503)
+        .json({
+          code: "DATABASE_CREDENTIALS_INVALID",
+          error:
+            "Check the backend Supabase URL and secret/service-role key in Render.",
+        });
+    if (err instanceof z.ZodError)
+      return res.status(400).json({
+        error: "Please check the form fields.",
+        details: err.issues.map((i) => ({
+          field: i.path.join("."),
+          message: i.message,
+        })),
+      });
     if (err.type === "entity.too.large")
       return res.status(413).json({ error: "Request is too large." });
     if (err instanceof SyntaxError && "body" in err)
       return res.status(400).json({ error: "Invalid JSON." });
-    console.error("API request failed:", err.name || "Error");
-    res
-      .status(503)
-      .json({
-        error: "The service is temporarily unavailable. Please try again.",
-      });
+    console.error("API request failed:", err.code || err.name || "Error");
+    res.status(503).json({
+      error: "The service is temporarily unavailable. Please try again.",
+    });
   });
   return app;
 }
