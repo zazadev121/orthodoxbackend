@@ -48,6 +48,8 @@ export function encodeSource(source) {
 }
 
 export function selectedAnswer(selection, sources, language) {
+  const passage = (source) =>
+    language === "en" ? source.content : source[`content_${language}`];
   if (
     !selection ||
     !Array.isArray(selection.sourceIds) ||
@@ -60,9 +62,7 @@ export function selectedAnswer(selection, sources, language) {
     !ids.every((id) =>
       sources.some(
         (s) =>
-          s.id === id &&
-          typeof s[`content_${language}`] === "string" &&
-          s[`content_${language}`].trim(),
+          s.id === id && typeof passage(s) === "string" && passage(s).trim(),
       ),
     )
   )
@@ -70,9 +70,8 @@ export function selectedAnswer(selection, sources, language) {
   // Generated prose never reaches the visitor; return only approved passages.
   const answer = ids
     .map((id) =>
-      sources
-        .find((s) => s.id === id)
-        [`content_${language}`].trim()
+      passage(sources.find((s) => s.id === id))
+        .trim()
         .split(/\n\s*\n/)
         .map((p) => `${p} [${id}]`)
         .join("\n\n"),
@@ -186,6 +185,7 @@ export function retrieve(question, sources) {
     .slice(0, 4);
 }
 export const refusal = {
+  en: "I could not find enough information in the approved sources to answer this question. Please make your question more specific or speak with an Orthodox priest.",
   ckb: "لە سەرچاوە پەسەندکراوەکاندا زانیاریی پێویستم بۆ وەڵامی ئەم پرسیارە نەدۆزییەوە. تکایە پرسیارەکەت وردتر بکەوە یان لە قەشەیەکی ئۆرتۆدۆکس بپرسە.",
   kmr: "Di çavkaniyên pejirandî de agahiya têr ji bo bersiva vê pirsê nehat dîtin. Ji kerema xwe pirsê zelaltir bike an ji kahînekî Ortodoks bipirse.",
 };
@@ -214,7 +214,7 @@ export function validateAnswer(raw, sources, language) {
   )
     return null;
   if (language === "ckb" && !/[\u0600-\u06ff]/.test(raw.answer)) return null;
-  if (language === "kmr" && /[\u0600-\u06ff]/.test(raw.answer)) return null;
+  if (language !== "ckb" && /[\u0600-\u06ff]/.test(raw.answer)) return null;
   // Links are supplied by the server, never by generated prose.
   if (/https?:\/\/|www\./i.test(raw.answer)) return null;
   return {

@@ -486,7 +486,7 @@ test("AI validates input and reports missing credentials", async () => {
     (
       await request(app)
         .post("/api/chat")
-        .send({ question: "faith", language: "en" })
+        .send({ question: "faith", language: "fr" })
     ).status,
     400,
   );

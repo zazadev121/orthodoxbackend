@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { starterSources, encodeSource } from "./sources.js";
 import { starterPrayers } from "./prayers.js";
+import { encodeContent } from "./content-i18n.js";
+export const starterPrayerRows = starterPrayers.map((p) => encodeContent(p));
 
 export const starterSourceRows = starterSources.map((source, i) =>
   encodeSource({
@@ -26,6 +28,16 @@ export async function bootstrapContent({ env = process.env, db } = {}) {
   ]);
   if (sources.error) throw sources.error;
   if (prayers.error) throw prayers.error;
+  // Add English only to untouched seeded Kurdish prayers; preserve owner edits.
+  for (let i = 0; i < starterPrayers.length; i++) {
+    const updated = await client
+      .from("prayers")
+      .update({ text_kmr: starterPrayerRows[i].text_kmr })
+      .eq("id", starterPrayers[i].id)
+      .eq("text_kmr", starterPrayers[i].text_kmr)
+      .eq("text_ckb", starterPrayers[i].text_ckb);
+    if (updated.error) throw updated.error;
+  }
   // Upgrade only untouched English starter summaries; owner-edited text is preserved.
   for (let i = 0; i < starterSources.length; i++) {
     const update = await client
@@ -43,7 +55,7 @@ export async function bootstrapContent({ env = process.env, db } = {}) {
   // Ignore existing IDs so a partial first import can recover without overwriting edits.
   const prayerResult = await client
     .from("prayers")
-    .upsert(starterPrayers, { onConflict: "id", ignoreDuplicates: true });
+    .upsert(starterPrayerRows, { onConflict: "id", ignoreDuplicates: true });
   if (prayerResult.error) throw prayerResult.error;
   const sourceResult = await client
     .from("sources")

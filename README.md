@@ -1,5 +1,7 @@
 # Orthodoxy in Kurdistan — backend
 
+English (`en`) is supported for AI answers and as an optional comparison translation on prayers/quotations. English source answers use the existing English evidence summary. Content translations use a tagged JSON envelope inside the existing `text_kmr` column and are decoded at API boundaries; legacy plain Kurdish rows remain compatible. No SQL migration is needed. On startup, English is added only to untouched seeded prayer texts, preserving owner edits. English fields are optional on custom records; the frontend clearly indicates missing translations.
+
 ## AI answer integrity
 
 The AI now **selects approved source passages instead of writing or translating doctrine**. Groq returns only source IDs; the server supplies the selected Sorani/Kurmanji passage text and citation URLs. Arbitrary generated prose and links are discarded. If a source lacks the selected language or the evidence does not answer the question, the server refuses. This limits answers to the small approved library; expand it with the source editor.

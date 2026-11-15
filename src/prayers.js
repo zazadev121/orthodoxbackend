@@ -103,3 +103,53 @@ export const starterPrayers = [
     source_url: "https://www.oca.org/questions/dailylife/blessing-before-meals",
   }),
 ];
+const englishPrayers = [
+  {
+    title_en: "Morning prayer — opening",
+    topic_en: "Morning",
+    text_en:
+      "Having risen from sleep, we bow before You, O Blessed One, and sing to You, O Mighty One, the angels’ hymn: Holy, holy, holy are You, O God. Through the prayers of the Mother of God, have mercy on us.",
+  },
+  {
+    title_en: "Night prayer — peace before sleep",
+    topic_en: "Evening",
+    text_en:
+      "O eternal God, King of all creation, who has allowed me to reach this hour, forgive the sins I have committed today in thought, word and deed. Grant me peaceful sleep this night. Amen.",
+  },
+  {
+    title_en: "The Jesus Prayer",
+    topic_en: "Christ",
+    text_en: "Lord Jesus Christ, Son of God, have mercy on me, a sinner.",
+  },
+  {
+    title_en: "Rejoice, O Virgin Mother of God",
+    topic_en: "Theotokos",
+    text_en:
+      "Rejoice, O Virgin Mother of God! Mary, full of grace, the Lord is with you. Blessed are you among women, and blessed is the fruit of your womb, for you have given birth to the Savior of our souls.",
+  },
+  {
+    title_en: "Our Father",
+    topic_en: "Essential prayers",
+    text_en:
+      "Our Father in heaven, may Your name be holy. May Your kingdom come; may Your will be done on earth as in heaven. Give us today our daily bread. Forgive our trespasses, as we forgive those who trespass against us. Do not lead us into temptation, but deliver us from evil. Amen.",
+  },
+  {
+    title_en: "O Heavenly King",
+    topic_en: "Holy Spirit",
+    text_en:
+      "O Heavenly King, Comforter, Spirit of Truth, everywhere present and filling all things, Treasury of good things and Giver of life: come and dwell in us, cleanse us from every impurity, and save our souls, O Good One.",
+  },
+  {
+    title_en: "The Trisagion — thrice holy",
+    topic_en: "Essential prayers",
+    text_en:
+      "Holy God, Holy Mighty, Holy Immortal, have mercy on us.\n\n(Pray three times.)",
+  },
+  {
+    title_en: "Prayer before meals",
+    topic_en: "Meals",
+    text_en:
+      "O Christ our God, bless the food and drink of Your servants, for You are blessed forever. Amen.",
+  },
+];
+starterPrayers.forEach((p, i) => Object.assign(p, englishPrayers[i]));
