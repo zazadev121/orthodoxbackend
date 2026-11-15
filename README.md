@@ -1,0 +1,62 @@
+# Orthodoxy in Kurdistan — backend
+
+Node 22+ / Express API, Supabase Auth + Postgres, Groq. Frontend: https://github.com/zazadev121/orthodoxfrontend
+
+## Setup
+
+1. Create a Supabase project. Run `supabase/schema.sql` in its SQL Editor.
+2. Copy `.env.example` to `.env`. Set `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (a new secret key or legacy service-role key). Find these in Project Settings → API Keys; the project URL is available in the project's Connect dialog / Data API settings. **Never use a server key in the frontend.** A Postgres connection string is not needed.
+3. Create an email/password user under Authentication → Users. Copy the user's UUID and run:
+
+   ```sql
+   insert into public.admins(user_id) values ('YOUR-USER-UUID') on conflict do nothing;
+   ```
+
+   Admin status is stored in a protected table, never in editable user metadata. Disable public sign-ups in Supabase Auth if only the owner needs an account. Set a strong password. Password resets can be sent from Supabase's dashboard; configure its Site URL and redirect URLs for your deployed frontend.
+
+4. Create a **replacement** Groq API key and put it in backend `.env` as `GROQ_API_KEY`. Revoke any key previously pasted in chat. The app does not contain that key.
+5. `npm ci`
+6. `node --env-file=.env scripts/seed.mjs` to install four reviewed starter editorial summaries. With a configured database, AI uses only approved rows in `sources`; there is no hidden fallback corpus.
+7. `npm run dev` (http://localhost:4000). Run the frontend separately.
+
+## Environment
+
+| Variable              | Purpose                                            |
+| --------------------- | -------------------------------------------------- |
+| `PORT`                | API port; default 4000                             |
+| `FRONTEND_ORIGIN`     | Exact allowed frontend origins, comma separated    |
+| `SUPABASE_URL`        | Project HTTPS URL                                  |
+| `SUPABASE_SECRET_KEY` | Server-only secret or legacy service-role key      |
+| `GROQ_API_KEY`        | Server-only replacement Groq key                   |
+| `GROQ_MODEL`          | Configurable model; default `openai/gpt-oss-120b`  |
+| `TRUST_PROXY_HOPS`    | Exact number of trusted reverse proxies; default 0 |
+
+## API
+
+- `GET /api/health`: configuration status, never secret values.
+- `GET /api/quotes`: published quotations only.
+- `GET /api/sources`: approved source metadata.
+- `POST /api/chat`: `{ "question": "...", "language": "ckb" }`; `kmr` also supported. Defaults to Sorani. Returns answer, grounding status, and server-generated citation links.
+- `GET /api/admin/me`: validates an administrator session.
+- `GET, POST /api/admin/quotes`, `PATCH, DELETE /api/admin/quotes/:id`.
+- `GET, POST /api/admin/sources`, `PATCH, DELETE /api/admin/sources/:id`.
+
+All admin endpoints require `Authorization: Bearer <Supabase user access token>`. RLS and revoked table grants prevent direct browser database reads or writes. The API server owns all database access, checks the user with Supabase Auth, then checks `admins`. CORS is an origin policy, not authentication. Server keys bypass RLS and must remain private.
+
+## Content and AI policy
+
+The server never searches Reddit, forums, or the general web. Approved publishers are an exact allowlist in `src/sources.js`: OCA, Greek Orthodox Archdiocese of America, Ecumenical Patriarchate, Antiochian Archdiocese. Administrators must personally verify each source and Kurdish translation before publishing or approving it. A trusted hostname alone does not prove a passage is accurate.
+
+AI uses lexical retrieval across multilingual keywords and approved source summaries. Expand the corpus and add Sorani/Kurmanji keywords in the admin panel. No match means a Kurdish refusal. The prompt restricts answers to retrieved evidence, and the server rejects missing/invented citation IDs, generated URLs and obvious wrong-script answers. Supplied source summaries are editorial paraphrases, not verbatim quotations. Public Church Fathers quotations start empty deliberately; add correctly attributed, checked Kurdish translations with work/section references.
+
+**Limits:** generation cannot guarantee exclusive factual grounding, perfect Kurdish, or theological accuracy. Citation validation does not prove entailment; the script checks do not establish language fluency. The small initial corpus intentionally declines most topics. Have Kurdish-speaking Orthodox reviewers test answers, expand sources, and review translations before public launch. Pastoral decisions belong with clergy. Questions are sent to Groq but are not stored in this app's database.
+
+Rate limits are per process/IP (100 API requests/minute, 8 AI questions/minute). For multi-instance public deployment, add a shared limiter and provider spend caps. No rate-limit bypass is enabled by default; configure proxy hops accurately for your host.
+
+## Deployment
+
+Deploy this folder as a Node web service (for example, a Node-compatible container host). Build/install command: `npm ci --omit=dev`. Start command: `npm start`. A `Dockerfile` is included. Set server environment variables in the host's secret manager, use HTTPS, and set `FRONTEND_ORIGIN` to the deployed frontend origin. Point the frontend's `VITE_API_URL` at this API and rebuild it. Configure Supabase Auth for the frontend domain. Never commit `.env` files.
+
+## Verification
+
+`npm test` covers authentication and admin-role rejection, published-only reads, input validation, source allowlisting, multilingual retrieval, AI refusal, citation checks, and mocked provider failures. `npm run check` verifies server syntax. Tests mock Supabase/Groq and do not assert live account connectivity. After setting credentials, verify admin sign-in → draft → publish → public quotation → edit → delete, and try grounded/refused AI questions in both languages.
