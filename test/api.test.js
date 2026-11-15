@@ -324,6 +324,12 @@ test("trusted URLs reject lookalikes, plaintext and credentials", () => {
 });
 test("retrieval requires a relevant approved source in either language", () => {
   assert.ok(
+    retrieve(
+      "Şîrovekirina Pirtûka Pîroz di Dêrê de çawa ye?",
+      starterSources,
+    ).some((s) => s.id === "interpretation"),
+  );
+  assert.ok(
     retrieve("نەریتی پیرۆز چییە؟", starterSources).some(
       (s) => s.id === "tradition",
     ),
@@ -526,6 +532,11 @@ test("AI returns server-owned citations and defaults to Sorani", async () => {
   );
   assert.ok(!res.body.answer.includes("malicious"));
   assert.match(payload.messages[0].content, /Sorani/);
+  assert.ok(
+    JSON.parse(payload.messages[1].content).approvedEvidence.some(
+      (s) => s.localizedPassage === starterSources[3].content_ckb,
+    ),
+  );
 });
 test("upstream errors and invalid model output fail closed", async () => {
   for (const fetcher of [

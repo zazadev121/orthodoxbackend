@@ -175,7 +175,10 @@ export function retrieve(question, sources) {
       score: words.filter(
         (w) =>
           !stop.has(w) &&
-          normalize(`${s.title} ${s.content} ${s.keywords}`).includes(w),
+          (normalize(`${s.title} ${s.content} ${s.keywords}`).includes(w) ||
+            (
+              normalize(s.keywords || "").match(/[\p{L}\p{N}]{3,}/gu) || []
+            ).some((k) => w.startsWith(k))),
       ).length,
     }))
     .filter((s) => s.score > 0)
