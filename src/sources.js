@@ -5,6 +5,86 @@ export const approvedHosts = [
   "ec-patr.org",
   "antiochian.org",
 ];
+export const localizedPassages = {
+  tradition: {
+    ckb: "نەریتی پیرۆز ئەو ژیان و باوەڕەیە کە لە کڵێسادا نەوە بە نەوە گوازراوەتەوە. کتێبی پیرۆز لەناو ئەم نەریتەدا شوێنێکی سەرەکی هەیە. دەبێت دابونەریتی کاتیی مرۆڤەکان لە باوەڕی نێردراوان، کە بەردەوامە، جیا بکرێتەوە.",
+    kmr: "Kevneşopiya Pîroz ew jiyan û bawerî ye ku di Dêrê de ji nifşekî derbasî nifşekî din bûye. Pirtûka Pîroz di vê kevneşopiyê de cihê sereke digire. Divê adetên demkî yên mirovan ji baweriya mayînde ya şandiyan werin veqetandin.",
+  },
+  scripture: {
+    ckb: "لە باوەڕی ئۆرتۆدۆکسدا، کتێبی پیرۆز سەرەکیترین شایەتیی نووسراوی فێرکردنی خوداییە. کڵێسا وەک نووسراوێکی بە ئیلهامی ڕۆحی پیرۆز وەریدەگرێت و کتێبەکانی لە پەیوەندی بە عیسای مەسیحەوە دەخوێنێتەوە.",
+    kmr: "Di baweriya Ortodoks de, Pirtûka Pîroz şahidiya nivîskî ya sereke ya hînkirina Îlahî ye. Dêr wê wek nivîseke bi îlhama Ruhê Pîroz dipejirîne û pirtûkên wê di têkiliya bi Îsa Mesîh de dixwîne.",
+  },
+  interpretation: {
+    ckb: "تێگەیشتنی ئۆرتۆدۆکس لە کتێبی پیرۆز لە چوارچێوەی نەریتی زیندوو و کۆمەڵی خواپەرستی کڵێسادایە. ڕۆحی پیرۆز ڕێنماییی ئەم تێگەیشتنە دەکات لە شایەتیی کتێبی پیرۆز دەربارەی مەسیح.",
+    kmr: "Şîrovekirina Ortodoks a Pirtûka Pîroz di çarçoveya kevneşopiya zindî û civaka perestkar a Dêrê de ye. Ruhê Pîroz rêberiya vê fêmkirina şahidiya Pirtûka Pîroz ya li ser Mesîh dike.",
+  },
+  faith: {
+    ckb: "باوەڕی مەسیحی متمانە بە خودا و پابەندبوون بەوە. دانپێدانانی باوەڕ، باوەڕی کەسی لەناو کڵێسادا دەردەبڕێت. باوەڕ لە هیوا، خۆشەویستی و ژیانێک کە ڕۆحی پیرۆز شێوەی پێ دەدات جیا نابێتەوە.",
+    kmr: "Baweriya Xiristiyanî bawerî û girêdayîbûn bi Xwedê ye. Daxuyaniya baweriyê, îtirafa kesane ya baweriyê di nav Dêrê de nîşan dide. Bawerî ji hêvî, evîn û jiyaneke ku Ruhê Pîroz şêwazê dide wê nayê veqetandin.",
+  },
+};
+export function decodeSource(source) {
+  try {
+    const parsed = JSON.parse(source.content);
+    if (parsed && typeof parsed.en === "string")
+      return {
+        ...source,
+        content: parsed.en,
+        content_ckb: typeof parsed.ckb === "string" ? parsed.ckb : "",
+        content_kmr: typeof parsed.kmr === "string" ? parsed.kmr : "",
+      };
+  } catch {}
+  return source;
+}
+export function encodeSource(source) {
+  const { content_ckb, content_kmr, ...row } = source;
+  if (content_ckb && content_kmr)
+    row.content = JSON.stringify({
+      en: source.content,
+      ckb: content_ckb,
+      kmr: content_kmr,
+    });
+  return row;
+}
+
+export function selectedAnswer(selection, sources, language) {
+  if (
+    !selection ||
+    !Array.isArray(selection.sourceIds) ||
+    !selection.sourceIds.length ||
+    selection.sourceIds.length > 4
+  )
+    return null;
+  const ids = [...new Set(selection.sourceIds)];
+  if (
+    !ids.every((id) =>
+      sources.some(
+        (s) =>
+          s.id === id &&
+          typeof s[`content_${language}`] === "string" &&
+          s[`content_${language}`].trim(),
+      ),
+    )
+  )
+    return null;
+  // Generated prose never reaches the visitor; return only approved passages.
+  const answer = ids
+    .map((id) =>
+      sources
+        .find((s) => s.id === id)
+        [`content_${language}`].trim()
+        .split(/\n\s*\n/)
+        .map((p) => `${p} [${id}]`)
+        .join("\n\n"),
+    )
+    .join("\n\n");
+  const validated = validateAnswer(
+    { answer, citationIds: ids },
+    sources,
+    language,
+  );
+  return validated ? { ...validated, mode: "approved-passages" } : null;
+}
 export function approvedUrl(value) {
   try {
     const u = new URL(value);
@@ -61,6 +141,10 @@ export const starterSources = [
       "faith creed belief love hope باوەڕ خۆشەویستی هیوا bawerî evîn hêvî",
   },
 ];
+for (const source of starterSources) {
+  source.content_ckb = localizedPassages[source.id].ckb;
+  source.content_kmr = localizedPassages[source.id].kmr;
+}
 const normalize = (s) =>
   s.toLowerCase().normalize("NFKC").replace(/[يى]/g, "ی").replace(/ك/g, "ک");
 export function retrieve(question, sources) {

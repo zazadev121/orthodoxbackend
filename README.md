@@ -1,5 +1,11 @@
 # Orthodoxy in Kurdistan — backend
 
+## AI answer integrity
+
+The AI now **selects approved source passages instead of writing or translating doctrine**. Groq returns only source IDs; the server supplies the selected Sorani/Kurmanji passage text and citation URLs. Arbitrary generated prose and links are discarded. If a source lacks the selected language or the evidence does not answer the question, the server refuses. This limits answers to the small approved library; expand it with the source editor.
+
+The source editor supports English evidence/context plus Sorani and Kurmanji passages. Both Kurdish passages are required before approval. They are serialized into the existing `sources.content` column, so this update needs no SQL migration. On startup only untouched English starter summaries are upgraded to bilingual content; custom/edited source text is preserved. This prevents generated doctrinal paraphrases, but source selection, translation quality and source accuracy still require editorial review. The starter translations are site editorial translations, not official church translations.
+
 ## Initial prayer library
 
 On startup, a configured backend initializes an empty library with eight bilingual traditional prayers/excerpts and four approved editorial AI source summaries. No credentials need to be committed. Existing rows with matching IDs are preserved; once any source exists, restarts leave the library alone, including edited and deleted prayers. A partially completed prayer-only import can recover if only built-in prayer IDs are present. Custom prayer libraries are never overwritten. Set `BOOTSTRAP_STARTER_CONTENT=false` to disable this behavior (also use this if intentionally removing the entire source collection and resetting all built-in content).

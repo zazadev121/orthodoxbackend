@@ -2,7 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { bootstrapContent, starterSourceRows } from "../src/bootstrap.js";
 import { starterPrayers } from "../src/prayers.js";
-import { approvedUrl } from "../src/sources.js";
+import {
+  approvedUrl,
+  starterSources,
+  decodeSource,
+  selectedAnswer,
+} from "../src/sources.js";
 
 function database(initial = {}) {
   const rows = { prayers: [], sources: [], ...structuredClone(initial) };
@@ -10,6 +15,22 @@ function database(initial = {}) {
     rows,
     from(table) {
       return {
+        update(values) {
+          const filters = [];
+          const chain = {
+            eq(key, value) {
+              filters.push([key, value]);
+              return chain;
+            },
+            then(resolve, reject) {
+              for (const row of rows[table])
+                if (filters.every(([key, value]) => row[key] === value))
+                  Object.assign(row, values);
+              return Promise.resolve({ error: null }).then(resolve, reject);
+            },
+          };
+          return chain;
+        },
         select() {
           return {
             limit: async () => ({
@@ -29,6 +50,45 @@ function database(initial = {}) {
     },
   };
 }
+test("English-only untouched starter rows gain bilingual passages; owner edits remain intact", async () => {
+  const db = database({
+    sources: starterSourceRows.map((s, i) => ({
+      ...s,
+      content: i === 0 ? "Owner edited this source" : starterSources[i].content,
+    })),
+  });
+  await bootstrapContent({ env: {}, db });
+  assert.equal(db.rows.sources[0].content, "Owner edited this source");
+  assert.equal(
+    decodeSource(db.rows.sources[3]).content_ckb,
+    starterSources[3].content_ckb,
+  );
+});
+test("only selected editorial passages can appear, never model-authored prose", () => {
+  const result = selectedAnswer(
+    {
+      sourceIds: ["faith"],
+      answer: "Invented prose",
+      url: "https://reddit.com",
+    },
+    starterSources,
+    "ckb",
+  );
+  assert.equal(result.answer, starterSources[3].content_ckb + " [faith]");
+  assert.equal(result.mode, "approved-passages");
+  assert.equal(
+    selectedAnswer({ sourceIds: ["nonexistent"] }, starterSources, "ckb"),
+    null,
+  );
+  assert.equal(
+    selectedAnswer(
+      { sourceIds: ["faith"] },
+      [{ ...starterSources[3], content_ckb: undefined }],
+      "ckb",
+    ),
+    null,
+  );
+});
 test("starter library installs eight bilingual sourced prayers and four approved sources", async () => {
   const db = database();
   assert.equal((await bootstrapContent({ env: {}, db })).status, "initialized");

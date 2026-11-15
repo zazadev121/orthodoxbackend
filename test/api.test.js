@@ -265,6 +265,8 @@ test("only approved source records are exposed and used for AI", async () => {
     publisher: "Orthodox Church in America",
     url: "https://www.oca.org/orthodoxy",
     content: "This is test editorial content used only for automated testing.",
+    content_ckb: "دەقی سۆرانی بۆ تاقیکردنەوە",
+    content_kmr: "Nivîsa Kurmancî ji bo ceribandinê",
     keywords: "testing",
     approved: false,
   };
@@ -500,8 +502,9 @@ test("AI returns server-owned citations and defaults to Sorani", async () => {
             {
               message: {
                 content: JSON.stringify({
-                  answer: "باوەڕ [faith]",
-                  citationIds: ["faith"],
+                  sourceIds: ["faith"],
+                  answer:
+                    "This malicious generated prose must never reach the visitor",
                 }),
               },
             },
@@ -516,6 +519,12 @@ test("AI returns server-owned citations and defaults to Sorani", async () => {
   assert.equal(res.status, 200);
   assert.equal(res.body.grounded, true);
   assert.equal(res.body.citations[0].publisher, "Orthodox Church in America");
+  assert.ok(
+    res.body.answer.startsWith(
+      starterSources.find((s) => s.id === "faith").content_ckb,
+    ),
+  );
+  assert.ok(!res.body.answer.includes("malicious"));
   assert.match(payload.messages[0].content, /Sorani/);
 });
 test("upstream errors and invalid model output fail closed", async () => {
