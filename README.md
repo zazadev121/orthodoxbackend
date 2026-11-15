@@ -1,5 +1,11 @@
 # Orthodoxy in Kurdistan — backend
 
+## Initial prayer library
+
+On startup, a configured backend initializes an empty library with eight bilingual traditional prayers/excerpts and four approved editorial AI source summaries. No credentials need to be committed. Existing rows with matching IDs are preserved; once any source exists, restarts leave the library alone, including edited and deleted prayers. A partially completed prayer-only import can recover if only built-in prayer IDs are present. Custom prayer libraries are never overwritten. Set `BOOTSTRAP_STARTER_CONTENT=false` to disable this behavior (also use this if intentionally removing the entire source collection and resetting all built-in content).
+
+The eight entries are the morning opening, a short night prayer, Jesus Prayer, Rejoice O Virgin Theotokos, Our Father, O Heavenly King, Trisagion and a blessing before meals. Each links to an OCA or GOARCH publication and is marked as a site translation. These are **working Sorani/Kurmanji translations**, not official approved liturgical translations or full morning/evening prayer rules. The frontend prominently explains the review requirement. Owner edits can improve them without being replaced on deployment. See `src/prayers.js` for the catalogue and `test/bootstrap.test.js` for import safety tests.
+
 ## Prayers, single owner, and Render troubleshooting
 
 Run the latest `supabase/schema.sql` in Supabase SQL Editor even if you ran an earlier version. It adds bilingual prayers and a database constraint permitting **at most one** admin. It never deletes existing users. If multiple old admin rows exist, resolve ownership manually before rerunning the migration.

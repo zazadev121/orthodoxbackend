@@ -1,4 +1,14 @@
 import { createApp } from "./app.js";
+import { bootstrapContent } from "./bootstrap.js";
+try {
+  const result = await bootstrapContent();
+  console.log("Starter library:", result.status);
+} catch (error) {
+  console.error(
+    "Starter library initialization failed:",
+    error.code || error.name || "Error",
+  );
+}
 const port = Number(process.env.PORT || 4000);
 const server = createApp().listen(port, () =>
   console.log(`Orthodoxy in Kurdistan API listening on ${port}`),
