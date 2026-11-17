@@ -2,7 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 export const migration = readFileSync(
   new URL(
-    "../../supabase/migrations/20261117163506_editorial_cms.sql",
+    "../../supabase/migrations/20261117171939_editorial_cms.sql",
     import.meta.url,
   ),
   "utf8",
