@@ -28,8 +28,8 @@ export function decodeContent(row) {
       return {
         ...row,
         text_kmr: value.kmr,
-        text_en: typeof value.en === "string" ? value.en : "",
-        title_en: typeof value.title_en === "string" ? value.title_en : "",
+        text_en: row.text_en ?? (typeof value.en === "string" ? value.en : ""),
+        title_en: row.title_en ?? (typeof value.title_en === "string" ? value.title_en : ""),
       };
   } catch {}
   return row;

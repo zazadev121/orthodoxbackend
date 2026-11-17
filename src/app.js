@@ -1,4 +1,5 @@
 import express from "express";
+import { registerEditorialApi } from "./editorial-api.js";
 import cors from "cors";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
@@ -58,7 +59,7 @@ const prayerSchema = quoteSchema.omit({ father: true }).extend({
   title_en: z.string().trim().max(200).optional(),
 });
 const idSchema = z.uuid();
-export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
+export function createApp({ env = process.env, db, fetcher = fetch, scriptureFetcher = fetch } = {}) {
   const supabase =
     db ||
     (env.SUPABASE_URL && env.SUPABASE_SECRET_KEY
@@ -81,7 +82,7 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
       allowedHeaders: ["Authorization", "Content-Type"],
     }),
   );
-  app.use(express.json({ limit: "100kb" }));
+  app.use(express.json({ limit: "1mb" }));
   app.use(
     "/api",
     rateLimit({
@@ -126,6 +127,7 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
         });
     next();
   }
+  registerEditorialApi(app, { db: supabase, needDb, admin, scriptureFetcher });
   app.get("/api/quotes", async (req, res) => {
     if (!supabase) return res.json({ quotes: [], setupRequired: true });
     let query = supabase
@@ -334,6 +336,9 @@ export function createApp({ env = process.env, db, fetcher = fetch } = {}) {
   );
   app.use((_req, res) => res.status(404).json({ error: "Route not found." }));
   app.use((err, _req, res, _next) => {
+    if (err.status && err.code && err.code !== "LIMIT_FILE_SIZE") return res.status(err.status).json({ code: err.code, error: err.message });
+    if (err.code === "23505") return res.status(409).json({ code: "DUPLICATE_RECORD", error: "This slug or Bible passage already exists. Edit the existing record or choose another identifier." });
+    if (err.code === "23503") return res.status(400).json({ code: "INVALID_RELATION", error: "A linked author, image or edition is missing. Reload and select it again." });
     if (err.code === "TRANSLATIONS_TOO_LONG")
       return res.status(400).json({ code: err.code, error: err.message });
     if (["PGRST205", "42P01", "PGRST204", "42703"].includes(err.code))

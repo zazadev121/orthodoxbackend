@@ -1,3 +1,27 @@
+# Editorial CMS upgrade
+
+The owner dashboard now manages authors/saints, quotations, prayers, doctrine/council articles, writings, Bible explanations, explicit Bible text revisions, dated daily verses, edition visibility, and website copy/images/section visibility. Existing owner authentication remains unchanged. No editorial write route calls AI.
+
+Apply `supabase/migrations/20261117163506_editorial_cms.sql` once before enabling the new dashboard. This additive migration captures original quotation/prayer/source rows in the private revision history, links quotations to author UUIDs through exact names/aliases, preserves unknown author names as minimal editable profiles, and imports the old static saints and teachings without overwriting existing IDs. Repeating it does not replace edited or archived records. The original rows' textual checksums should be compared before/after migration.
+
+Every quotation, writing, and Bible explanation has an author foreign key. Public profile counts are computed from published, non-archived rows in PostgreSQL; no separate per-profile quote collection exists. Doctrine-to-author links are saved transactionally. Drafts stay private. DELETE archives records; restores always return them as drafts. Optimistic `updated_at` checks protect against overwriting a newer edit. Text and whitespace are stored verbatim, and translations are never generated. Server startup no longer seeds, upgrades, or rewrites content.
+
+The UI uses the original language/theme/font preferences and existing visual tokens. Public readers refresh on focus, editorial notifications, and every 30 seconds while visible. Admin saves immediately notify other open tabs. Bible source chapters retain their existing cache; explanations and explicit text revisions are loaded separately from the central database. The licensed original verse remains available beside any explicitly approved revision.
+
+## Public reader and deployment
+
+`supabase/functions/public-content` is a read-only edge reader to keep public pages independent of Render's free-service cold starts. It and Express share `supabase/functions/_shared/editorial-read.js`. The edge function validates the project's publishable/anon API key itself, accepts GET/OPTIONS only, and exposes only whitelisted published-data queries. It cannot write or read administration, backups, drafts, or archived rows. Server keys stay inside the function environment. All tables still deny direct anonymous/authenticated access; owner writes go through the verified-owner API.
+
+Deploy the `public-content` function with its `_shared` dependencies and `verify_jwt=false` because the function performs its own public API-key validation. The frontend uses its existing public Supabase configuration for this reader and falls back to the existing API during rollout. No additional client secrets are needed. Docker includes the shared read module.
+
+Image uploads go through owner authentication, check file signatures/MIME types, and accept PNG/JPEG/WebP/AVIF up to 6 MB. Objects receive immutable unique paths in `editorial-media`; replacing an image never overwrites a file used elsewhere. Removing an icon clears its association; archived content and previous images remain recoverable.
+
+Run `npm test` for legacy API tests plus real PostgreSQL (PGlite) migration/API integration tests. They exercise preservation/reruns, source-backed quote fields, twenty linked quotes and counts, aliases, drafts, archives/restores, optimistic conflicts, transactional doctrine links, Bible coordinates/multiple authors/revisions, image checks, backups, RLS and unauthorized callers. `scripts/verify-cms.mjs` is an explicit local-only fixture for browser QA and is never imported by production.
+
+## Earlier setup documentation
+
+The following notes describe the older starter setup. Automatic startup seeding and English-upgrade behavior below are superseded by the explicit insert-only CMS migration above.
+
 # Orthodoxy in Kurdistan — backend
 
 Owner sign-in is restricted server-side to the verified Supabase email `gelaguka6@gmail.com` (override with `OWNER_EMAIL`). Its first authenticated admin request assigns the single `admins` role if vacant. Unverified email accounts, user metadata claims and other addresses cannot claim ownership. Existing conflicting admin records are never deleted or replaced automatically. Published prayers remain available anonymously through `GET /api/prayers`; only writing and draft access require owner authentication.
