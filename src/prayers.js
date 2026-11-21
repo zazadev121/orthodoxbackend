@@ -31,11 +31,11 @@ export const starterPrayers = [
     source_url: "https://www.oca.org/orthodoxy/prayers/evening-prayers",
   }),
   prayer(3, {
-    title_ckb: "دوعای عیسای مەسیح",
+    title_ckb: "دوعای یەشوای مەسیح",
     title_kmr: "Duaya Îsa Mesîh",
     topic: "مەسیح / Mesîh",
     text_ckb:
-      "ئەی پەروەردگار عیسای مەسیح، کوڕی خودا، بەزەییت بە منی گوناهباردا بێتەوە.",
+      "ئەی پەروەردگار یەشوای مەسیح، کوڕی خودا، بەزەییت بە منی گوناهباردا بێتەوە.",
     text_kmr: "Ey Xudan Îsa Mesîh, Kurê Xwedê, li min, gunehkar, rehmê bike.",
     reference:
       "OCA, The Orthodox Faith, Volume II: Prayer — Jesus Prayer; site translation",

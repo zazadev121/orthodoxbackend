@@ -1,3 +1,8 @@
+// Owner-requested Sorani spelling for AI answers; stored evidence remains unchanged.
+export function canonicalAnswerNames(text, language) {
+  if(language !== "ckb") return text;
+  return text.replace(/(^|[^\p{L}\p{N}])(عیسا|عیسی|عيسا|عيسى)(?=$|[^\p{L}\p{N}]|(?:ی|دا|وە|ەوە|و|ش)(?:$|[^\p{L}\p{N}]))/gu, (_,prefix)=>prefix+"یەشوا");
+}
 // Editorial summaries, not quotations or Kurdish Bible translations.
 export const approvedHosts = [
   "oca.org",
@@ -11,7 +16,7 @@ export const localizedPassages = {
     kmr: "Kevneşopiya Pîroz ew jiyan û bawerî ye ku di Dêrê de ji nifşekî derbasî nifşekî din bûye. Pirtûka Pîroz di vê kevneşopiyê de cihê sereke digire. Divê adetên demkî yên mirovan ji baweriya mayînde ya şandiyan werin veqetandin.",
   },
   scripture: {
-    ckb: "لە باوەڕی ئۆرتۆدۆکسدا، کتێبی پیرۆز سەرەکیترین شایەتیی نووسراوی فێرکردنی خوداییە. کڵێسا وەک نووسراوێکی بە ئیلهامی ڕۆحی پیرۆز وەریدەگرێت و کتێبەکانی لە پەیوەندی بە عیسای مەسیحەوە دەخوێنێتەوە.",
+    ckb: "لە باوەڕی ئۆرتۆدۆکسدا، کتێبی پیرۆز سەرەکیترین شایەتیی نووسراوی فێرکردنی خوداییە. کڵێسا وەک نووسراوێکی بە ئیلهامی ڕۆحی پیرۆز وەریدەگرێت و کتێبەکانی لە پەیوەندی بە یەشوای مەسیحەوە دەخوێنێتەوە.",
     kmr: "Di baweriya Ortodoks de, Pirtûka Pîroz şahidiya nivîskî ya sereke ya hînkirina Îlahî ye. Dêr wê wek nivîseke bi îlhama Ruhê Pîroz dipejirîne û pirtûkên wê di têkiliya bi Îsa Mesîh de dixwîne.",
   },
   interpretation: {
@@ -68,7 +73,7 @@ export function selectedAnswer(selection, sources, language) {
   )
     return null;
   // Generated prose never reaches the visitor; return only approved passages.
-  const answer = ids
+  const answer = canonicalAnswerNames(ids
     .map((id) =>
       passage(sources.find((s) => s.id === id))
         .trim()
@@ -76,7 +81,7 @@ export function selectedAnswer(selection, sources, language) {
         .map((p) => `${p} [${id}]`)
         .join("\n\n"),
     )
-    .join("\n\n");
+    .join("\n\n"), language);
   const validated = validateAnswer(
     { answer, citationIds: ids },
     sources,
@@ -117,7 +122,7 @@ export const starterSources = [
     content:
       "The Bible is the principal written witness to divine teaching in Orthodoxy. The Church receives it as inspired by the Holy Spirit and reads its books in relation to Jesus Christ.",
     keywords:
-      "bible scripture jesus christ کتێبی پیرۆز عیسا مەسیح Îsa Mesîh Incîl",
+      "bible scripture jesus christ کتێبی پیرۆز یەشوا مەسیح Îsa Mesîh Incîl",
   },
   {
     id: "interpretation",
@@ -148,7 +153,7 @@ const normalize = (s) =>
   s.toLowerCase().normalize("NFKC").replace(/[يى]/g, "ی").replace(/ك/g, "ک");
 export function retrieve(question, sources) {
   const words = [
-    ...new Set(normalize(question).match(/[\p{L}\p{N}]{3,}/gu) || []),
+    ...new Set(normalize(canonicalAnswerNames(question, "ckb")).match(/[\p{L}\p{N}]{3,}/gu) || []),
   ];
   const stop = new Set([
     "what",
@@ -174,9 +179,9 @@ export function retrieve(question, sources) {
       score: words.filter(
         (w) =>
           !stop.has(w) &&
-          (normalize(`${s.title} ${s.content} ${s.title_ka || ""} ${s.content_ka || ""} ${s.keywords}`).includes(w) ||
+          (normalize(canonicalAnswerNames(`${s.title} ${s.content} ${s.title_ka || ""} ${s.content_ka || ""} ${s.keywords}`, "ckb")).includes(w) ||
             (
-              normalize(s.keywords || "").match(/[\p{L}\p{N}]{3,}/gu) || []
+              normalize(canonicalAnswerNames(s.keywords || "", "ckb")).match(/[\p{L}\p{N}]{3,}/gu) || []
             ).some((k) => w.startsWith(k))),
       ).length,
     }))
