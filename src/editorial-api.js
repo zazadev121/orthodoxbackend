@@ -11,6 +11,7 @@ import {
   validatePublishing,
   imageType,
 } from "./editorial-model.js";
+import { georgianVerseNumbers } from "../supabase/functions/_shared/georgian-bible.js";
 import { bibleBooks } from "../supabase/functions/_shared/bible-books.js";
 const uuid = z.uuid();
 const unwrap = (result) => {
@@ -244,6 +245,12 @@ export function registerEditorialApi(
       const edition = row.edition_id || "eng_webu",
         key = `${edition}/${row.book}/${row.chapter}`;
       let numbers = chapterCache.get(key);
+      if (!numbers && edition === "ka_ogb") {
+        const available = georgianVerseNumbers[row.book]?.[row.chapter];
+        if (!available) throw editorialError("Choose a valid Georgian New Testament passage.");
+        numbers = new Set(available);
+        chapterCache.set(key, numbers);
+      }
       if (!numbers) {
         try {
           const response = await scriptureFetcher(
@@ -289,7 +296,7 @@ export function registerEditorialApi(
       const author = unwrap(
         await db
           .from("authors")
-          .select("id,published,deleted_at,name_en,name_ckb,name_kmr")
+          .select("id,published,deleted_at,name_en,name_ckb,name_kmr,name_ka")
           .eq("id", id)
           .is("deleted_at", null)
           .maybeSingle(),
@@ -305,7 +312,7 @@ export function registerEditorialApi(
           "Publish the selected author before publishing linked content.",
         );
       if (resource === "quotes" && !row.father)
-        row.father = author.name_en || author.name_ckb || author.name_kmr;
+        row.father = author.name_en || author.name_ckb || author.name_kmr || author.name_ka;
     }
     if (row.icon_media_id) {
       const media = unwrap(

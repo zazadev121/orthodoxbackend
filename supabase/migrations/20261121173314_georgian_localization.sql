@@ -1,0 +1,64 @@
+-- Additive Georgian storage. Existing language columns and rows are untouched.
+begin;
+alter table public.prayers add column if not exists review_note_ka text;
+alter table public.bible_explanations add column if not exists review_note_ka text;
+alter table public.daily_verses add column if not exists reference_ka text;
+alter table public.quotes add column if not exists review_note_ka text;
+alter table public.authors add column if not exists name_ka text;
+alter table public.authors add column if not exists title_ka text;
+alter table public.authors add column if not exists position_ka text;
+alter table public.authors add column if not exists summary_ka text;
+alter table public.authors add column if not exists biography_ka text;
+alter table public.authors add column if not exists history_ka text;
+alter table public.authors add column if not exists contributions_ka text;
+alter table public.authors add column if not exists writings_intro_ka text;
+alter table public.authors add column if not exists feast_ka text;
+alter table public.authors add column if not exists life_dates_ka text;
+alter table public.authors add column if not exists source_reference_ka text;
+alter table public.authors add column if not exists icon_alt_ka text;
+alter table public.authors add column if not exists icon_credit_ka text;
+alter table public.authors add column if not exists birth_info_ka text;
+alter table public.authors add column if not exists death_info_ka text;
+alter table public.quotes add column if not exists text_ka text;
+alter table public.quotes add column if not exists reference_ka text;
+alter table public.quotes add column if not exists topic_ka text;
+alter table public.prayers add column if not exists title_ka text;
+alter table public.prayers add column if not exists text_ka text;
+alter table public.prayers add column if not exists reference_ka text;
+alter table public.prayers add column if not exists topic_ka text;
+alter table public.writings add column if not exists title_ka text;
+alter table public.writings add column if not exists subtitle_ka text;
+alter table public.writings add column if not exists body_ka text;
+alter table public.writings add column if not exists reference_ka text;
+alter table public.doctrines add column if not exists title_ka text;
+alter table public.doctrines add column if not exists subtitle_ka text;
+alter table public.doctrines add column if not exists body_ka text;
+alter table public.doctrines add column if not exists bible_references_ka text;
+alter table public.doctrines add column if not exists father_references_ka text;
+alter table public.doctrines add column if not exists council_references_ka text;
+alter table public.doctrines add column if not exists reference_ka text;
+alter table public.doctrines add column if not exists icon_alt_ka text;
+alter table public.doctrines add column if not exists icon_credit_ka text;
+alter table public.bible_explanations add column if not exists title_ka text;
+alter table public.bible_explanations add column if not exists body_ka text;
+alter table public.bible_explanations add column if not exists reference_ka text;
+alter table public.bible_editions add column if not exists title_ka text;
+alter table public.bible_editions add column if not exists description_ka text;
+alter table public.content_blocks add column if not exists text_ka text;
+alter table public.sources add column if not exists title_ka text;
+alter table public.sources add column if not exists content_ka text;
+alter table public.sources add column if not exists publisher_ka text;
+alter table public.doctrines drop constraint if exists doctrines_category_check;
+alter table public.doctrines add constraint doctrines_category_check check(category in ('doctrine','council','history'));
+create or replace view public.author_public_stats with (security_invoker=true) as select a.id,a.slug,a.legacy_key,a.name_en,a.name_ckb,a.name_kmr,a.title_en,a.title_ckb,a.title_kmr,a.position_en,a.position_ckb,a.position_kmr,a.summary_en,a.summary_ckb,a.summary_kmr,a.biography_en,a.biography_ckb,a.biography_kmr,a.history_en,a.history_ckb,a.history_kmr,a.contributions_en,a.contributions_ckb,a.contributions_kmr,a.writings_intro_en,a.writings_intro_ckb,a.writings_intro_kmr,a.feast_en,a.feast_ckb,a.feast_kmr,a.life_dates_en,a.life_dates_ckb,a.life_dates_kmr,a.birth_info,a.death_info,a.aliases,a.kind,a.icon_url,a.icon_media_id,a.icon_alt,a.icon_credit,a.icon_source,a.icon_license_url,a.source_reference,a.source_url,a.sort_order,a.published,a.created_at,a.updated_at,a.deleted_at,
+(select count(*)::integer from public.quotes q where q.author_id=a.id and q.published and q.deleted_at is null) as quote_count,
+(select count(*)::integer from public.writings w where w.author_id=a.id and w.published and w.deleted_at is null) as writing_count,
+a.name_ka,a.title_ka,a.position_ka,a.summary_ka,a.biography_ka,a.history_ka,a.contributions_ka,a.writings_intro_ka,a.feast_ka,a.life_dates_ka,a.source_reference_ka,a.icon_alt_ka,a.icon_credit_ka,a.birth_info_ka,a.death_info_ka
+from public.authors a where a.published and a.deleted_at is null;
+create or replace view public.public_quote_topics with (security_invoker=true) as select distinct q.topic,q.topic_ka from public.quotes q join public.authors a on a.id=q.author_id where q.published and q.deleted_at is null and a.published and a.deleted_at is null;
+create or replace view public.public_prayer_topics with (security_invoker=true) as select distinct topic,topic_ka from public.prayers where published and deleted_at is null;
+revoke all on public.author_public_stats,public.public_quote_topics,public.public_prayer_topics from anon,authenticated;
+grant select on public.author_public_stats,public.public_quote_topics,public.public_prayer_topics to service_role;
+insert into public.content_migrations(key) values('georgian-localization-v1') on conflict(key) do nothing;
+notify pgrst,'reload schema';
+commit;

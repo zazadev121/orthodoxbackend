@@ -12,10 +12,10 @@ const unwrap = (result) => {
 const live = (q) => q.eq("published", true).is("deleted_at", null);
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const person = "id,slug,name_en,name_ckb,name_kmr,title_en,title_ckb,title_kmr";
-const card = `${person},position_en,position_ckb,position_kmr,summary_en,summary_ckb,summary_kmr,feast_en,feast_ckb,feast_kmr,aliases,kind,icon_url,icon_alt,sort_order,quote_count,writing_count,updated_at`;
+const person = "id,slug,name_en,name_ckb,name_kmr,name_ka,title_en,title_ckb,title_kmr,title_ka";
+const card = `${person},position_en,position_ckb,position_kmr,position_ka,summary_en,summary_ckb,summary_kmr,summary_ka,feast_en,feast_ckb,feast_kmr,feast_ka,aliases,kind,icon_url,icon_alt,sort_order,quote_count,writing_count,updated_at`;
 const articleCard =
-  "id,slug,category,council_year,title_en,title_ckb,title_kmr,subtitle_en,subtitle_ckb,subtitle_kmr,icon_url,icon_alt,sort_order,updated_at,doctrine_authors(author_id)";
+  "id,slug,category,council_year,title_en,title_ckb,title_kmr,title_ka,subtitle_en,subtitle_ckb,subtitle_kmr,subtitle_ka,icon_url,icon_alt,sort_order,updated_at,doctrine_authors(author_id)";
 const authorLive = (q) =>
   q.eq("author.published", true).is("author.deleted_at", null);
 const integer = (value, fallback, min, max) => {
@@ -138,7 +138,7 @@ export async function readEditorial(db, path, params = new URLSearchParams()) {
       !metadata ||
       chapter < metadata.firstChapterNumber ||
       chapter > metadata.lastChapterNumber ||
-      !["eng_webu", "ckb_bib"].includes(edition)
+      !["eng_webu", "ckb_bib", "ka_ogb"].includes(edition)
     )
       throw bad("Invalid Bible passage.");
     const [explanations, overrides] = await Promise.all([
@@ -167,7 +167,7 @@ export async function readEditorial(db, path, params = new URLSearchParams()) {
       edition = params.get("edition");
     if (
       !/^\d{4}-\d{2}-\d{2}$/.test(date || "") ||
-      !["eng_webu", "ckb_bib"].includes(edition)
+      !["eng_webu", "ckb_bib", "ka_ogb"].includes(edition)
     )
       throw bad("Invalid date or edition.");
     return {
@@ -192,7 +192,7 @@ export async function readEditorial(db, path, params = new URLSearchParams()) {
   if (linked && params.get("author_id"))
     query = query.eq("author_id", idValue(params.get("author_id")));
   if (table === "doctrines" && params.get("category")) {
-    if (!["doctrine", "council"].includes(params.get("category")))
+    if (!["doctrine", "council", "history"].includes(params.get("category")))
       throw bad("Invalid category.");
     query = query.eq("category", params.get("category"));
   }
@@ -202,8 +202,11 @@ export async function readEditorial(db, path, params = new URLSearchParams()) {
       query,
       params.get("q"),
       table === "quotes"
-        ? ["father", "text_ckb", "text_kmr", "text_en", "topic"]
+        ? ["father", "text_ckb", "text_kmr", "text_en", "text_ka", "topic", "topic_ka"]
         : [
+            "title_ka",
+            "text_ka",
+            "topic_ka",
             "title_en",
             "title_ckb",
             "title_kmr",
@@ -222,20 +225,23 @@ export async function readEditorial(db, path, params = new URLSearchParams()) {
     .range((page - 1) * limit, page * limit - 1);
   const rows = unwrap(result);
   if (["quotes", "prayers"].includes(table)) {
-    const topics = unwrap(
+    const topicRows = unwrap(
       await db
         .from(
           table === "quotes" ? "public_quote_topics" : "public_prayer_topics",
         )
-        .select("topic")
+        .select("topic,topic_ka")
         .order("topic"),
-    ).map((row) => row.topic);
+    );
+    const topics = [...new Set(topicRows.map((row) => row.topic))];
+    const topicTranslations = Object.fromEntries(topicRows.filter(row => row.topic_ka).map(row => [row.topic, row.topic_ka]));
     return {
       [table]: rows.map(decode),
       total: result.count ?? rows.length,
       page,
       limit,
       topics,
+      topicTranslations,
     };
   }
   return { items: rows, total: result.count ?? rows.length, page, limit };

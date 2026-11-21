@@ -82,7 +82,7 @@ export function selectedAnswer(selection, sources, language) {
     sources,
     language,
   );
-  return validated ? { ...validated, mode: "approved-passages" } : null;
+  return validated ? { ...validated, citations: validated.citations.map(c => { const source = sources.find(s => s.id === c.id); return language === "ka" ? {...c,title:source.title_ka || "პირველწყარო",publisher:source.publisher_ka || "მართლმადიდებლური გამოცემა"} : c; }), mode: "approved-passages" } : null;
 }
 export function approvedUrl(value) {
   try {
@@ -174,7 +174,7 @@ export function retrieve(question, sources) {
       score: words.filter(
         (w) =>
           !stop.has(w) &&
-          (normalize(`${s.title} ${s.content} ${s.keywords}`).includes(w) ||
+          (normalize(`${s.title} ${s.content} ${s.title_ka || ""} ${s.content_ka || ""} ${s.keywords}`).includes(w) ||
             (
               normalize(s.keywords || "").match(/[\p{L}\p{N}]{3,}/gu) || []
             ).some((k) => w.startsWith(k))),
@@ -185,6 +185,7 @@ export function retrieve(question, sources) {
     .slice(0, 4);
 }
 export const refusal = {
+  ka: "დამტკიცებულ წყაროებში ამ კითხვაზე პასუხის გასაცემად საკმარისი ინფორმაცია ვერ მოიძებნა. დააზუსტეთ შეკითხვა ან მიმართეთ მართლმადიდებელ მღვდელს.",
   en: "I could not find enough information in the approved sources to answer this question. Please make your question more specific or speak with an Orthodox priest.",
   ckb: "لە سەرچاوە پەسەندکراوەکاندا زانیاریی پێویستم بۆ وەڵامی ئەم پرسیارە نەدۆزییەوە. تکایە پرسیارەکەت وردتر بکەوە یان لە قەشەیەکی ئۆرتۆدۆکس بپرسە.",
   kmr: "Di çavkaniyên pejirandî de agahiya têr ji bo bersiva vê pirsê nehat dîtin. Ji kerema xwe pirsê zelaltir bike an ji kahînekî Ortodoks bipirse.",
@@ -213,6 +214,7 @@ export function validateAnswer(raw, sources, language) {
       .some((p) => !ids.some((id) => p.includes(`[${id}]`)))
   )
     return null;
+  if (language === "ka" && !/[\u10a0-\u10ff\u1c90-\u1cbf]/.test(raw.answer)) return null;
   if (language === "ckb" && !/[\u0600-\u06ff]/.test(raw.answer)) return null;
   if (language !== "ckb" && /[\u0600-\u06ff]/.test(raw.answer)) return null;
   // Links are supplied by the server, never by generated prose.

@@ -18,7 +18,10 @@ export async function sqlFixture({ migrate = false } = {}) {
       "utf8",
     ).replace("create extension if not exists pgcrypto;", ""),
   );
-  if (migrate) await db.exec(migration);
+  if (migrate) {
+    await db.exec(migration);
+    await db.exec(readFileSync(new URL("../../supabase/migrations/20261121173314_georgian_localization.sql", import.meta.url), "utf8"));
+  }
   return db;
 }
 export function postgrestFixture(pg) {
