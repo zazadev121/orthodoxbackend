@@ -13,7 +13,7 @@ import {
 function memoryDb({
   user = {
     id: "user-id",
-    email: "gelaguka6@gmail.com",
+    email: "admin@example.com",
     email_confirmed_at: "2026-11-15T00:00:00Z",
   },
   adminRows = [{ user_id: "user-id" }],
@@ -97,7 +97,7 @@ function memoryDb({
 }
 
 test("verified owner claims the one admin role on first sign-in", async () => {
-  const app = createApp({ env: {}, db: memoryDb({ adminRows: [] }) });
+  const app = createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: memoryDb({ adminRows: [] }) });
   for (let i = 0; i < 2; i++) {
     const r = await request(app)
       .get("/api/admin/me")
@@ -108,7 +108,7 @@ test("verified owner claims the one admin role on first sign-in", async () => {
 });
 test("unverified owner and other emails cannot become admin", async () => {
   for (const user of [
-    { id: "user-id", email: "gelaguka6@gmail.com" },
+    { id: "user-id", email: "admin@example.com" },
     {
       id: "user-id",
       email: "other@example.com",
@@ -118,10 +118,10 @@ test("unverified owner and other emails cannot become admin", async () => {
       id: "user-id",
       email: "other@example.com",
       email_confirmed_at: "2026-11-15",
-      user_metadata: { email: "gelaguka6@gmail.com" },
+      user_metadata: { email: "admin@example.com" },
     },
   ]) {
-    const r = await request(createApp({ env: {}, db: memoryDb({ user }) }))
+    const r = await request(createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: memoryDb({ user }) }))
       .get("/api/admin/me")
       .set("Authorization", "Bearer user");
     assert.equal(r.status, 403);
@@ -130,7 +130,7 @@ test("unverified owner and other emails cannot become admin", async () => {
 test("automatic owner access never replaces an existing different admin", async () => {
   const r = await request(
     createApp({
-      env: {},
+      env: { OWNER_EMAIL: "admin@example.com" },
       db: memoryDb({ adminRows: [{ user_id: "someone-else" }] }),
     }),
   )
@@ -139,7 +139,7 @@ test("automatic owner access never replaces an existing different admin", async 
   assert.equal(r.status, 403);
 });
 test("prayer lifecycle protects drafts and supports bilingual edits", async () => {
-  const app = createApp({ env: {}, db: memoryDb() });
+  const app = createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: memoryDb() });
   const draft = {
     title_ckb: "نوێژی تاقیکردنەوە",
     title_kmr: "Duaya ceribandinê",
@@ -192,7 +192,7 @@ test("Render defaults to one trusted proxy; explicit configuration takes precede
     ),
     false,
   );
-  assert.equal(createApp({ env: {} }).get("trust proxy"), false);
+  assert.equal(createApp({ env: { OWNER_EMAIL: "admin@example.com" } }).get("trust proxy"), false);
 });
 
 test("missing tables and invalid database credentials return actionable setup codes", async () => {
@@ -218,7 +218,7 @@ test("missing tables and invalid database credentials return actionable setup co
         return chain;
       },
     };
-    const res = await request(createApp({ env: {}, db })).get("/api/quotes");
+    const res = await request(createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db })).get("/api/quotes");
     assert.equal(res.status, 503);
     assert.equal(res.body.code, expected);
   }
@@ -226,7 +226,7 @@ test("missing tables and invalid database credentials return actionable setup co
 
 test("missing Groq key is reported before database retrieval", async () => {
   const app = createApp({
-    env: {},
+    env: { OWNER_EMAIL: "admin@example.com" },
     db: {
       from() {
         throw new Error("must not query");
@@ -241,7 +241,7 @@ test("missing Groq key is reported before database retrieval", async () => {
 });
 
 test("quotation lifecycle: draft stays private, publish, edit, delete", async () => {
-  const app = createApp({ env: {}, db: memoryDb() });
+  const app = createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: memoryDb() });
   const draft = {
     father: "Test editorial record",
     text_ckb: "دەقی تاقیکردنەوە",
@@ -302,7 +302,7 @@ test("quotation lifecycle: draft stays private, publish, edit, delete", async ()
 });
 
 test("quotes can be created, published and edited without a source URL", async () => {
-  const app = createApp({ env: {}, db: memoryDb() });
+  const app = createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: memoryDb() });
   const quote = {
     father: "Test Father",
     text_ckb: "دەقی تاقیکردنەوە",
@@ -335,11 +335,13 @@ test("quotes can be created, published and edited without a source URL", async (
 
 test("only approved source records are exposed and used for AI", async () => {
   let providerCalled = false;
+  let providerPayload;
   const app = createApp({
-    env: { GROQ_API_KEY: "test-only" },
+    env: { GROQ_API_KEY: "test-only", OWNER_EMAIL: "admin@example.com" },
     db: memoryDb(),
-    fetcher: async () => {
+    fetcher: async (_url, options) => {
       providerCalled = true;
+      providerPayload = JSON.parse(options.body);
       return { ok: false };
     },
   });
@@ -359,15 +361,10 @@ test("only approved source records are exposed and used for AI", async () => {
     .send(source);
   assert.equal(created.status, 201);
   assert.deepEqual((await request(app).get("/api/sources")).body.sources, []);
-  assert.equal(
-    (
-      await request(app)
-        .post("/api/chat")
-        .send({ question: "testing", language: "kmr" })
-    ).body.grounded,
-    false,
-  );
-  assert.equal(providerCalled, false);
+  assert.equal((await request(app).post("/api/chat").send({ question: "testing", language: "kmr" })).status, 502);
+  assert.equal(providerCalled, true);
+  assert.deepEqual(JSON.parse(providerPayload.messages[1].content), { question: "testing" });
+  providerCalled = false;
   await request(app)
     .patch(`/api/admin/sources/${created.body.id}`)
     .set("Authorization", "Bearer admin")
@@ -460,7 +457,7 @@ test("answer validation rejects invented citations, wrong script and generated l
   );
 });
 test("unconfigured database is explicit and never grants admin access", async () => {
-  const app = createApp({ env: {} });
+  const app = createApp({ env: { OWNER_EMAIL: "admin@example.com" } });
   const health = await request(app).get("/api/health");
   assert.equal(health.body.databaseConfigured, false);
   const quotes = await request(app).get("/api/quotes");
@@ -478,7 +475,7 @@ function mockDb({ admin = true, valid = true } = {}) {
               data: {
                 user: {
                   id: "user-id",
-                  email: admin ? "gelaguka6@gmail.com" : "visitor@example.com",
+                  email: admin ? "admin@example.com" : "visitor@example.com",
                   email_confirmed_at: "2026-11-15T00:00:00Z",
                 },
               },
@@ -517,7 +514,7 @@ function mockDb({ admin = true, valid = true } = {}) {
 test("admin endpoints reject missing tokens, invalid tokens and ordinary users", async () => {
   assert.equal(
     (
-      await request(createApp({ env: {}, db: mockDb().db })).get(
+      await request(createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: mockDb().db })).get(
         "/api/admin/me",
       )
     ).status,
@@ -525,7 +522,7 @@ test("admin endpoints reject missing tokens, invalid tokens and ordinary users",
   );
   assert.equal(
     (
-      await request(createApp({ env: {}, db: mockDb({ valid: false }).db }))
+      await request(createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: mockDb({ valid: false }).db }))
         .get("/api/admin/me")
         .set("Authorization", "Bearer invalid")
     ).status,
@@ -533,7 +530,7 @@ test("admin endpoints reject missing tokens, invalid tokens and ordinary users",
   );
   assert.equal(
     (
-      await request(createApp({ env: {}, db: mockDb({ admin: false }).db }))
+      await request(createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: mockDb({ admin: false }).db }))
         .get("/api/admin/quotes")
         .set("Authorization", "Bearer user")
     ).status,
@@ -541,7 +538,7 @@ test("admin endpoints reject missing tokens, invalid tokens and ordinary users",
   );
   assert.equal(
     (
-      await request(createApp({ env: {}, db: mockDb().db }))
+      await request(createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: mockDb().db }))
         .get("/api/admin/me")
         .set("Authorization", "Bearer admin")
     ).status,
@@ -550,19 +547,21 @@ test("admin endpoints reject missing tokens, invalid tokens and ordinary users",
 });
 test("public quotes always filter published records", async () => {
   const { db, calls } = mockDb();
-  await request(createApp({ env: {}, db })).get("/api/quotes");
+  await request(createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db })).get("/api/quotes");
   assert.ok(
     calls.some(
       (c) => c[0] === "quotes" && c[1] === "published" && c[2] === true,
     ),
   );
 });
-test("AI refuses unsupported questions without calling Groq", async () => {
+test("AI answers unsupported questions without presenting invented sources", async () => {
   let called = false;
   const app = createApp({
     env: { GROQ_API_KEY: "test-only" },
-    fetcher: async () => {
+    fetcher: async (_url, options) => {
       called = true;
+      assert.match(JSON.parse(options.body).messages[0].content, /No source passage has been verified/);
+      return { ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ answer: "ئەمە وەڵامێکی گشتییە بۆ پرسیارەکە." }) } }] }) };
     },
   });
   const res = await request(app)
@@ -570,10 +569,28 @@ test("AI refuses unsupported questions without calling Groq", async () => {
     .send({ question: "how to repair a bicycle", language: "ckb" });
   assert.equal(res.status, 200);
   assert.equal(res.body.grounded, false);
-  assert.equal(called, false);
+  assert.equal(res.body.mode, "ai-explanation");
+  assert.deepEqual(res.body.citations, []);
+  assert.equal(called, true);
+});
+test("AI falls back when matching summaries do not answer the question", async () => {
+  let calls = 0;
+  const app = createApp({
+    env: { GROQ_API_KEY: "test-only" },
+    fetcher: async () => {
+      calls++;
+      return { ok: true, json: async () => ({ choices: [{ message: { content: calls === 1 ? JSON.stringify({ sourceIds: [] }) : JSON.stringify({ answer: "Here is a careful explanation." }) } }] }) };
+    },
+  });
+  const res = await request(app).post("/api/chat").send({ question: "faith", language: "en" });
+  assert.equal(res.status, 200);
+  assert.equal(calls, 2);
+  assert.equal(res.body.answer, "Here is a careful explanation.");
+  assert.deepEqual(res.body.citations, []);
+  assert.equal(res.body.mode, "ai-explanation");
 });
 test("AI validates input and reports missing credentials", async () => {
-  const app = createApp({ env: {} });
+  const app = createApp({ env: { OWNER_EMAIL: "admin@example.com" } });
   assert.equal(
     (
       await request(app)
@@ -664,7 +681,7 @@ test("upstream errors and invalid model output fail closed", async () => {
   }
 });
 test("admin writes validate all fields and publisher hosts", async () => {
-  const app = createApp({ env: {}, db: mockDb().db });
+  const app = createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: mockDb().db });
   const res = await request(app)
     .post("/api/admin/quotes")
     .set("Authorization", "Bearer admin")
