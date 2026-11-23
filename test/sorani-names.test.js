@@ -9,3 +9,9 @@ test('Sorani AI uses the requested name including inflection without rewriting s
  assert.ok(result.answer.includes('یەشوا'));assert.ok(!result.answer.includes('عیسا'));assert.equal(source.content_ckb,'عیسا پەروەردگارە.');
  assert.equal(retrieve('یەشوا',[source]).length,1);
 });
+test('Sorani answers use the site glossary without changing the source record', () => {
+ const original = 'Saint, priest, archbishop, Patriarch, Begotten, proceeds, monk, church; سەرئەسقوف، ڕاهیب، پاتریارک';
+ const expected = 'پایەپیرۆز، قەشە، سەرۆکقەشە، پارتریاک، تاکخراو، دەردەچێت، تاکمەند، کڵێسا; سەرۆکقەشە، تاکمەند، پارتریاک';
+ assert.equal(canonicalAnswerNames(original, 'ckb').replaceAll(',', '،'), expected);
+ assert.equal(canonicalAnswerNames(original, 'en'), original);
+});
