@@ -680,6 +680,37 @@ test("upstream errors and invalid model output fail closed", async () => {
     assert.ok(res.status === 502 || res.body.grounded === false);
   }
 });
+test("verse AI follows the Bible edition and does not cite a general guide as verse evidence", async () => {
+  let prompt;
+  const db = {
+    from() {
+      const q = {
+        select() { return q; }, eq() { return q; }, is() { return q; },
+        order() { return q; }, limit() { return q; },
+        then(resolve) { return Promise.resolve({ data: [], error: null }).then(resolve); },
+      };
+      return q;
+    },
+  };
+  const app = createApp({
+    env: { GROQ_API_KEY: "test-only" }, db,
+    fetcher: async (_url, options) => {
+      prompt = JSON.parse(options.body).messages;
+      return { ok: true, json: async () => ({ choices: [{ message: { content: "Paul names the promise of life in Christ." } }] }) };
+    },
+  });
+  const res = await request(app).post("/api/bible/explain").send({
+    book: "2TI", chapter: 1, verse: 1, edition: "eng_webu",
+    language: "ckb", verseText: "Paul, an apostle of Jesus Christ through the will of God",
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.language, "en");
+  assert.equal(res.body.grounded_in_commentary, false);
+  assert.equal(res.body.source_url, null);
+  assert.match(prompt[0].content, /in English, matching the verse's language/);
+  assert.deepEqual(JSON.parse(prompt[1].content).commentary, []);
+});
+
 test("admin writes validate all fields and publisher hosts", async () => {
   const app = createApp({ env: { OWNER_EMAIL: "admin@example.com" }, db: mockDb().db });
   const res = await request(app)
