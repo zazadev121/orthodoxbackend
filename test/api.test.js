@@ -708,7 +708,23 @@ test("verse AI follows the Bible edition and does not cite a general guide as ve
   assert.equal(res.body.grounded_in_commentary, false);
   assert.equal(res.body.source_url, null);
   assert.match(prompt[0].content, /in English, matching the verse's language/);
+  assert.match(prompt[0].content, /Write entirely in English/);
+  assert.doesNotMatch(prompt[0].content, /یەشوا/);
   assert.deepEqual(JSON.parse(prompt[1].content).commentary, []);
+});
+
+test("English verse AI rejects a mixed-script answer", async () => {
+  const db = { from() {
+    const q = { select() { return q; }, eq() { return q; }, is() { return q; }, order() { return q; }, limit() { return q; },
+      then(resolve) { return Promise.resolve({ data: [], error: null }).then(resolve); } };
+    return q;
+  } };
+  const app = createApp({ env: { GROQ_API_KEY: "test-only" }, db,
+    fetcher: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "Jesus یەشوا gives life." } }] }) }) });
+  const res = await request(app).post("/api/bible/explain").send({
+    book: "2TI", chapter: 1, verse: 1, edition: "eng_webu", verseText: "Paul, an apostle of Jesus Christ",
+  });
+  assert.equal(res.status, 502);
 });
 
 test("admin writes validate all fields and publisher hosts", async () => {
