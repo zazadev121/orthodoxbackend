@@ -1,7 +1,18 @@
 // Owner-requested Sorani spelling for AI answers; stored evidence remains unchanged.
 export function canonicalAnswerNames(text, language) {
   if(language !== "ckb") return text;
-  return text.replace(/(^|[^\p{L}\p{N}])(عیسا|عیسی|عيسا|عيسى)(?=$|[^\p{L}\p{N}]|(?:ی|دا|وە|ەوە|و|ش)(?:$|[^\p{L}\p{N}]))/gu, (_,prefix)=>prefix+"یەشوا");
+  return text
+    .replace(/(^|[^\p{L}\p{N}])(عیسا|عیسی|عيسا|عيسى)(?=$|[^\p{L}\p{N}]|(?:ی|دا|وە|ەوە|و|ش)(?:$|[^\p{L}\p{N}]))/gu, (_,prefix)=>prefix+"یەشوا")
+    .replace(/\b(archbishops|archbishop|patriarchs|patriarch|priests|priest|saints|saint|monks|monk|begotten|proceeds|churches|church)\b/gi, word => ({
+      archbishops: "سەرۆکقەشەکان", archbishop: "سەرۆکقەشە", patriarchs: "پارتریاکەکان", patriarch: "پارتریاک",
+      priests: "قەشەکان", priest: "قەشە", saints: "پایەپیرۆزان", saint: "پایەپیرۆز",
+      monks: "تاکمەندەکان", monk: "تاکمەند", begotten: "تاکخراو", proceeds: "دەردەچێت",
+      churches: "کڵێساکان", church: "کڵێسا",
+    })[word.toLowerCase()] || word)
+    .replace(/سەرئەسقوف|پاتریارک|پەتریارک|ڕاهیب|کلیسا|کلیسە/g, word => ({
+      "سەرئەسقوف": "سەرۆکقەشە", "پاتریارک": "پارتریاک", "پەتریارک": "پارتریاک",
+      "ڕاهیب": "تاکمەند", "کلیسا": "کڵێسا", "کلیسە": "کڵێسا",
+    })[word]);
 }
 // Editorial summaries, not quotations or Kurdish Bible translations.
 export const approvedHosts = [
